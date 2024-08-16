@@ -7,7 +7,7 @@ Mix.install([
 
 # read config
 [
-  gitlab_to_forgejo: config
+  gitlab_to_gitea: config
 ] = Config.Reader.read!("./config.exs")
 
 # API Client for GitLab
@@ -116,9 +116,9 @@ defmodule GitlabAPI do
   end
 end
 
-# API Client for Forgejo
-defmodule ForgejoAPI do
-  @moduledoc "API client for Forgejo"
+# API Client for Gitea
+defmodule GiteaAPI do
+  @moduledoc "API client for Gitea"
 
   def build_client(host, token) do
     Req.new(
@@ -146,7 +146,7 @@ defmodule ForgejoAPI do
         full_name: gitlab_group.name,
         username: gitlab_group.slug,
         description: gitlab_group.description,
-        visibility: gitlab_visibility_to_forgejo(gitlab_group.visibility)
+        visibility: gitlab_visibility_to_gitea(gitlab_group.visibility)
       }
     )
     |> then(fn %{status: 201, body: body} -> body end)
@@ -160,7 +160,7 @@ defmodule ForgejoAPI do
         full_name: gitlab_group.name,
         username: gitlab_group.slug,
         description: gitlab_group.description,
-        visibility: gitlab_visibility_to_forgejo(gitlab_group.visibility)
+        visibility: gitlab_visibility_to_gitea(gitlab_group.visibility)
       }
     )
     |> then(fn %{status: 200, body: body} -> body end)
@@ -216,6 +216,7 @@ defmodule ForgejoAPI do
     |> Req.patch!(
       url: "/api/v1/admin/users/#{gitlab_user.username}",
       json: %{
+        login_name: gitlab_user.username,
         active: gitlab_user.state == "active",
         allow_create_organization: gitlab_user.can_create_group,
         max_repo_creation: (gitlab_user.can_create_project && nil) || -1,
@@ -250,18 +251,18 @@ defmodule ForgejoAPI do
     |> then(fn %{status: 201, body: body} -> body end)
   end
 
-  defp gitlab_visibility_to_forgejo("public"), do: "public"
-  defp gitlab_visibility_to_forgejo("internal"), do: "limited"
-  defp gitlab_visibility_to_forgejo("private"), do: "private"
+  defp gitlab_visibility_to_gitea("public"), do: "public"
+  defp gitlab_visibility_to_gitea("internal"), do: "limited"
+  defp gitlab_visibility_to_gitea("private"), do: "private"
 end
 
 Logger.info(
-  "Starting migration from GitLab at #{config[:gitlab_host]} to Forgejo at #{config[:forgejo_host]}"
+  "Starting migration from GitLab at #{config[:gitlab_host]} to Gitea at #{config[:gitea_host]}"
 )
 
 # build API clients
 gitlab_client = GitlabAPI.build_client(config[:gitlab_host], config[:gitlab_token])
-forgejo_client = ForgejoAPI.build_client(config[:forgejo_host], config[:forgejo_token])
+gitea_client = GiteaAPI.build_client(config[:gitea_host], config[:gitea_token])
 
 # fetch all users from GitLab
 gitlab_users = GitlabAPI.list_users(gitlab_client)
@@ -273,12 +274,12 @@ users_projects_list =
     Logger.info("Processing GitLab user #{gitlab_user.username}")
 
     # check if user exists
-    case ForgejoAPI.get_user(forgejo_client, gitlab_user) do
+    case GiteaAPI.get_user(gitea_client, gitlab_user) do
       nil ->
         # user does not exist, create it
         Logger.info("Creating user #{gitlab_user.username}")
-        ForgejoAPI.create_user(forgejo_client, gitlab_user)
-        ForgejoAPI.set_user_permissions(forgejo_client, gitlab_user)
+        GiteaAPI.create_user(gitea_client, gitlab_user)
+        GiteaAPI.set_user_permissions(gitea_client, gitlab_user)
 
       _org ->
         # user exists, skip it
@@ -305,16 +306,16 @@ groups_projects_list =
     Logger.info("Processing GitLab group #{gitlab_group.name}")
 
     # check if organization exists
-    case ForgejoAPI.get_organization(forgejo_client, gitlab_group) do
+    case GiteaAPI.get_organization(gitea_client, gitlab_group) do
       nil ->
         # organization does not exist, create it
         Logger.info("Creating organization #{gitlab_group.name}")
-        ForgejoAPI.create_organization(forgejo_client, gitlab_group)
+        GiteaAPI.create_organization(gitea_client, gitlab_group)
 
       _org ->
         # organization exists, update it
         Logger.info("Organization #{gitlab_group.name} exists, updating")
-        ForgejoAPI.update_organization(forgejo_client, gitlab_group)
+        GiteaAPI.update_organization(gitea_client, gitlab_group)
     end
 
     # fetch all projects of GitLab group
@@ -334,15 +335,15 @@ for {_type, gitlab_entity, gitlab_projects} <- users_projects_list ++ groups_pro
     Logger.info("Processing GitLab project #{gitlab_entity.slug}/#{gitlab_project.slug}")
 
     # check if the repository exists
-    case ForgejoAPI.get_repository(forgejo_client, gitlab_entity, gitlab_project) do
+    case GiteaAPI.get_repository(gitea_client, gitlab_entity, gitlab_project) do
       nil ->
         # repository does not exist, migrate it
         Logger.info(
           "Migrating repository #{gitlab_entity.slug}/#{gitlab_project.slug} - this may take a while"
         )
 
-        ForgejoAPI.perform_migration(
-          forgejo_client,
+        GiteaAPI.perform_migration(
+          gitea_client,
           config[:gitlab_token],
           gitlab_entity,
           gitlab_project
@@ -356,14 +357,14 @@ for {_type, gitlab_entity, gitlab_projects} <- users_projects_list ++ groups_pro
             "Repository #{gitlab_entity.slug}/#{gitlab_project.slug} already exists, deleting"
           )
 
-          ForgejoAPI.delete_repository(forgejo_client, gitlab_entity, gitlab_project)
+          GiteaAPI.delete_repository(gitea_client, gitlab_entity, gitlab_project)
 
           Logger.info(
             "Migrating repository #{gitlab_entity.slug}/#{gitlab_project.slug} - this may take a while"
           )
 
-          ForgejoAPI.perform_migration(
-            forgejo_client,
+          GiteaAPI.perform_migration(
+            gitea_client,
             config[:gitlab_token],
             gitlab_entity,
             gitlab_project
