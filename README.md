@@ -40,7 +40,7 @@ Projects will not be configured as a mirror.
 
 To run this script, you will need Elixir. I've tested it with Elixir 1.17, but it should work with other recent versions.
 
-I have tested this tool with GitLab `17.2.2-ce` and Forgejo `8.0.1`.
+I have tested this tool with GitLab `17.2.2-ce` and Forgejo `8.0.1`. Probably also works with Gitea, but I haven't tested it.
 
 First, create a config file called `config.exs` in the root of the project. It should look like this:
 
