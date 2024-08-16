@@ -6,6 +6,8 @@ Currently, it supports migrating users, organizations (groups on GitLab), and re
 
 **It does not migrate group and project memberships or permissions, as that is beyond the scope of what I needed.**
 
+Another thing to keep in mind is that GitLab limits the REST API page size to 100. That is enough for my usage, as I don't have more than 100 groups or users, and no groups or users with more than 100 projects. So, because I'm lazy, I didn't implement pagination.
+
 ### Users
 
 Migrated users will be created with a random password and will need to reset it on first login.

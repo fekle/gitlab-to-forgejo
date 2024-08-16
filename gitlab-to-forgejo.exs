@@ -23,7 +23,13 @@ defmodule GitlabAPI do
   def list_users(client) do
     Req.get!(
       client,
-      url: "/api/v4/users?humans=true&exclude_internal=true"
+      url: "/api/v4/users",
+      params: [
+        page: 1,
+        per_page: 100,
+        humans: true,
+        exclude_internal: true
+      ]
     )
     |> then(fn %{status: 200, body: body} -> body end)
     |> Enum.map(fn user ->
@@ -45,7 +51,11 @@ defmodule GitlabAPI do
   def list_groups(client) do
     Req.get!(
       client,
-      url: "/api/v4/groups"
+      url: "/api/v4/groups",
+      params: [
+        page: 1,
+        per_page: 100
+      ]
     )
     |> then(fn %{status: 200, body: body} -> body end)
     |> Enum.map(fn group ->
@@ -62,7 +72,11 @@ defmodule GitlabAPI do
   def list_group_projects(client, group_id) do
     Req.get!(
       client,
-      url: "/api/v4/groups/#{group_id}/projects"
+      url: "/api/v4/groups/#{group_id}/projects",
+      params: [
+        page: 1,
+        per_page: 100
+      ]
     )
     |> then(fn %{status: 200, body: body} -> body end)
     |> Enum.map(fn project ->
@@ -80,7 +94,11 @@ defmodule GitlabAPI do
   def list_user_projects(client, user_id) do
     Req.get!(
       client,
-      url: "/api/v4/users/#{user_id}/projects"
+      url: "/api/v4/users/#{user_id}/projects",
+      params: [
+        page: 1,
+        per_page: 100
+      ]
     )
     |> then(fn %{status: 200, body: body} -> body end)
     |> Enum.map(fn project ->
