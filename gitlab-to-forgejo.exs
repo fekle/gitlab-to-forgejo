@@ -281,7 +281,7 @@ users_projects_list =
         ForgejoAPI.set_user_permissions(forgejo_client, gitlab_user)
 
       _org ->
-        # user exists, update it
+        # user exists, skip it
         Logger.info("User #{gitlab_user.username} exists, skipping")
     end
 
@@ -321,7 +321,7 @@ groups_projects_list =
         ForgejoAPI.update_organization(forgejo_client, gitlab_group)
     end
 
-    # fetch all projects from GitLab group
+    # fetch all projects of GitLab group
     gitlab_group_projects =
       GitlabAPI.list_group_projects(gitlab_client, gitlab_group.id)
 
@@ -332,6 +332,7 @@ groups_projects_list =
     {:group, gitlab_group, gitlab_group_projects}
   end)
 
+# finally iterate over all groups and users and migrate their projects
 for {_type, gitlab_entity, gitlab_projects} <- users_projects_list ++ groups_projects_list do
   # iterate over all projects in the GitLab group or user
   for gitlab_project <- gitlab_projects do
