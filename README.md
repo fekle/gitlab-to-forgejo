@@ -1,6 +1,6 @@
 # GitLab to Forgejo migration tool
 
-This is a simple tool to quickly migrate all your GitLab organizations to Forgejo.
+This is a simple tool to quickly migrate all your GitLab organizations, users and projects to Forgejo.
 
 Currently, it supports migrating users, organizations (groups on GitLab), and repositories (projects on GitLab).
 
