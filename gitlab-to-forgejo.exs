@@ -12,6 +12,8 @@ Mix.install([
 
 # API Client for GitLab
 defmodule GitlabAPI do
+  @moduledoc "API client for GitLab"
+
   def build_client(host, token) do
     Req.new(
       base_url: host,
@@ -21,8 +23,8 @@ defmodule GitlabAPI do
   end
 
   def list_users(client) do
-    Req.get!(
-      client,
+    client
+    |> Req.get!(
       url: "/api/v4/users",
       params: [
         page: 1,
@@ -49,8 +51,8 @@ defmodule GitlabAPI do
   end
 
   def list_groups(client) do
-    Req.get!(
-      client,
+    client
+    |> Req.get!(
       url: "/api/v4/groups",
       params: [
         page: 1,
@@ -70,8 +72,8 @@ defmodule GitlabAPI do
   end
 
   def list_group_projects(client, group_id) do
-    Req.get!(
-      client,
+    client
+    |> Req.get!(
       url: "/api/v4/groups/#{group_id}/projects",
       params: [
         page: 1,
@@ -92,8 +94,8 @@ defmodule GitlabAPI do
   end
 
   def list_user_projects(client, user_id) do
-    Req.get!(
-      client,
+    client
+    |> Req.get!(
       url: "/api/v4/users/#{user_id}/projects",
       params: [
         page: 1,
@@ -116,6 +118,8 @@ end
 
 # API Client for Forgejo
 defmodule ForgejoAPI do
+  @moduledoc "API client for Forgejo"
+
   def build_client(host, token) do
     Req.new(
       base_url: host,
@@ -135,8 +139,8 @@ defmodule ForgejoAPI do
   end
 
   def create_organization(client, gitlab_group) do
-    Req.post!(
-      client,
+    client
+    |> Req.post!(
       url: "/api/v1/orgs",
       json: %{
         full_name: gitlab_group.name,
@@ -149,8 +153,8 @@ defmodule ForgejoAPI do
   end
 
   def update_organization(client, gitlab_group) do
-    Req.patch!(
-      client,
+    client
+    |> Req.patch!(
       url: "/api/v1/orgs/#{gitlab_group.slug}",
       json: %{
         full_name: gitlab_group.name,
@@ -173,10 +177,8 @@ defmodule ForgejoAPI do
   end
 
   def delete_repository(client, gitlab_entity, gitlab_project) do
-    Req.delete!(
-      client,
-      url: "/api/v1/repos/#{gitlab_entity.slug}/#{gitlab_project.slug}"
-    )
+    client
+    |> Req.delete!(url: "/api/v1/repos/#{gitlab_entity.slug}/#{gitlab_project.slug}")
     |> then(fn %{status: 204, body: body} -> body end)
   end
 
@@ -191,14 +193,14 @@ defmodule ForgejoAPI do
   end
 
   def create_user(client, gitlab_user) do
-    Req.post!(
-      client,
+    client
+    |> Req.post!(
       url: "/api/v1/admin/users",
       json: %{
         email: gitlab_user.email,
         full_name: gitlab_user.name,
         login_name: gitlab_user.username,
-        password: :crypto.strong_rand_bytes(32) |> Base.url_encode64(padding: false),
+        password: 32 |> :crypto.strong_rand_bytes() |> Base.url_encode64(padding: false),
         must_change_password: true,
         restricted: gitlab_user.external,
         send_notify: false,
@@ -210,8 +212,8 @@ defmodule ForgejoAPI do
   end
 
   def set_user_permissions(client, gitlab_user) do
-    Req.patch!(
-      client,
+    client
+    |> Req.patch!(
       url: "/api/v1/admin/users/#{gitlab_user.username}",
       json: %{
         active: gitlab_user.state == "active",
@@ -224,8 +226,8 @@ defmodule ForgejoAPI do
   end
 
   def perform_migration(client, gitlab_token, gitlab_entity, gitlab_project) do
-    Req.post!(
-      client,
+    client
+    |> Req.post!(
       url: "/api/v1/repos/migrate",
       json: %{
         auth_token: gitlab_token,
@@ -267,8 +269,7 @@ Logger.info("Found #{length(gitlab_users)} GitLab users")
 
 # iterate over all users on GitLab, create them if necessary and fetch their projects
 users_projects_list =
-  gitlab_users
-  |> Enum.map(fn gitlab_user ->
+  Enum.map(gitlab_users, fn gitlab_user ->
     Logger.info("Processing GitLab user #{gitlab_user.username}")
 
     # check if user exists
@@ -276,7 +277,6 @@ users_projects_list =
       nil ->
         # user does not exist, create it
         Logger.info("Creating user #{gitlab_user.username}")
-
         ForgejoAPI.create_user(forgejo_client, gitlab_user)
         ForgejoAPI.set_user_permissions(forgejo_client, gitlab_user)
 
@@ -286,8 +286,7 @@ users_projects_list =
     end
 
     # fetch all projects of GitLab user
-    gitlab_user_projects =
-      GitlabAPI.list_user_projects(gitlab_client, gitlab_user.id)
+    gitlab_user_projects = GitlabAPI.list_user_projects(gitlab_client, gitlab_user.id)
 
     Logger.info(
       "Found #{length(gitlab_user_projects)} projects of GitLab user #{gitlab_user.username}"
@@ -302,8 +301,7 @@ Logger.info("Found #{length(gitlab_groups)} GitLab groups")
 
 # iterate over all groups on GitLab, create or update them if necessary and fetch their projects
 groups_projects_list =
-  gitlab_groups
-  |> Enum.map(fn gitlab_group ->
+  Enum.map(gitlab_groups, fn gitlab_group ->
     Logger.info("Processing GitLab group #{gitlab_group.name}")
 
     # check if organization exists
@@ -311,19 +309,16 @@ groups_projects_list =
       nil ->
         # organization does not exist, create it
         Logger.info("Creating organization #{gitlab_group.name}")
-
         ForgejoAPI.create_organization(forgejo_client, gitlab_group)
 
       _org ->
         # organization exists, update it
         Logger.info("Organization #{gitlab_group.name} exists, updating")
-
         ForgejoAPI.update_organization(forgejo_client, gitlab_group)
     end
 
     # fetch all projects of GitLab group
-    gitlab_group_projects =
-      GitlabAPI.list_group_projects(gitlab_client, gitlab_group.id)
+    gitlab_group_projects = GitlabAPI.list_group_projects(gitlab_client, gitlab_group.id)
 
     Logger.info(
       "Found #{length(gitlab_group_projects)} projects in GitLab group #{gitlab_group.name}"
@@ -332,7 +327,7 @@ groups_projects_list =
     {:group, gitlab_group, gitlab_group_projects}
   end)
 
-# finally iterate over all groups and users and migrate their projects
+# finally, iterate over all groups and users and migrate their projects
 for {_type, gitlab_entity, gitlab_projects} <- users_projects_list ++ groups_projects_list do
   # iterate over all projects in the GitLab group or user
   for gitlab_project <- gitlab_projects do
@@ -355,34 +350,33 @@ for {_type, gitlab_entity, gitlab_projects} <- users_projects_list ++ groups_pro
 
       _repo ->
         # repository exists, check if we should delete it
-        case config[:delete_projects] do
-          true ->
-            # delete the repository and migrate it
-            Logger.warning(
-              "Repository #{gitlab_entity.slug}/#{gitlab_project.slug} already exists, deleting"
-            )
+        if config[:delete_projects] do
+          # delete the repository and migrate it
+          Logger.warning(
+            "Repository #{gitlab_entity.slug}/#{gitlab_project.slug} already exists, deleting"
+          )
 
-            ForgejoAPI.delete_repository(forgejo_client, gitlab_entity, gitlab_project)
+          ForgejoAPI.delete_repository(forgejo_client, gitlab_entity, gitlab_project)
 
-            Logger.info(
-              "Migrating repository #{gitlab_entity.slug}/#{gitlab_project.slug} - this may take a while"
-            )
+          Logger.info(
+            "Migrating repository #{gitlab_entity.slug}/#{gitlab_project.slug} - this may take a while"
+          )
 
-            ForgejoAPI.perform_migration(
-              forgejo_client,
-              config[:gitlab_token],
-              gitlab_entity,
-              gitlab_project
-            )
-
-          false ->
-            # skip the repository
-            Logger.warning(
-              "Repository #{gitlab_entity.slug}/#{gitlab_project.slug} already exists, skipping"
-            )
+          ForgejoAPI.perform_migration(
+            forgejo_client,
+            config[:gitlab_token],
+            gitlab_entity,
+            gitlab_project
+          )
+        else
+          # skip the repository
+          Logger.warning(
+            "Repository #{gitlab_entity.slug}/#{gitlab_project.slug} already exists, skipping"
+          )
         end
     end
   end
 end
 
+# we're done!
 Logger.info("Migration completed")
